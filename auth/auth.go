@@ -1,10 +1,10 @@
 package auth
 
 import (
-	"github.com/HydrologicEngineeringCenter/nsi_survey_server/models"
-	"github.com/HydrologicEngineeringCenter/nsi_survey_server/stores"
 	"github.com/google/uuid"
-	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v5"
+	"github.com/usace-nsi/nsi-survey-server/models"
+	"github.com/usace-nsi/nsi-survey-server/stores"
 	. "github.com/usace/microauth"
 )
 
@@ -15,11 +15,12 @@ const (
 	SURVEY_MEMBER
 )
 
-func Appauth(c echo.Context, authstore interface{}, roles []int, claims JwtClaim) bool {
+func Appauth(c *echo.Context, authstore interface{}, roles []int, claims JwtClaim) bool {
 	c.Set("NSIUSER", claims)
 	store := authstore.(*stores.SurveyStore)
+	//adding user to the user table
 	store.AddUser(models.User{
-		UserID:   claims.Sub,
+		UserID:   claims.Sub, //@TODO is sub dodid? is that pii?
 		Username: claims.UserName,
 	})
 
@@ -52,12 +53,3 @@ func Appauth(c echo.Context, authstore interface{}, roles []int, claims JwtClaim
 	}
 	return false
 }
-
-// func containsParam(paramNames []string, param string) bool {
-// 	for _, pn := range paramNames {
-// 		if pn == param {
-// 			return true
-// 		}
-// 	}
-// 	return false
-// }

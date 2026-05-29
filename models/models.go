@@ -11,14 +11,31 @@ type JwtClaim struct {
 	Sub  string
 	Name string
 }
+type StratificationType string
+
+const (
+	None        StratificationType = "NONE"
+	RESIDENTIAL StratificationType = "RESIDENTIAL"
+	FLOODZONE   StratificationType = "FLOODZONE"
+)
 
 type Survey struct {
-	ID          uuid.UUID `db:"id" json:"id"`
-	Title       string    `db:"title" json:"title"`
-	Description string    `db:"description" json:"description"`
-	Active      bool      `db:"active" json:"active"`
+	ID                 uuid.UUID `db:"id" json:"id"`
+	Title              string    `db:"title" json:"title"`
+	Description        string    `db:"description" json:"description"`
+	Active             bool      `db:"active" json:"active"`
+	DueDate            string    `db:"due_date" json:"due_date"`
+	InventorySource    string    `db:"inventory_source" json:"inventory_source"`
+	PerimeterGeom      *string   `db:"perimeter_geom" json:"perimeter_geom,omitempty"`
+	StratificationInfo `json:"stratification"`
 }
-
+type StratificationInfo struct {
+	StratificationType       StratificationType `db:"stratification_type" json:"stratification_type"`
+	Margin                   float64            `db:"margin" json:"margin"`
+	Proportion               float64            `db:"proportion" json:"proportion"`
+	Confidence               float64            `db:"confidence" json:"confidence"`
+	PercentControlStructures float64            `db:"pct_control" json:"pct_control"`
+}
 type User struct {
 	UserID   string `db:"user_id" json:"userId"`
 	Username string `db:"user_name" json:"userName"`
@@ -56,6 +73,7 @@ type SurveyElement struct {
 	SurveyOrder int       `json:"surveyOrder" db:"survey_order"`
 	FD_ID       int       `json:"fdId" db:"fd_id"`
 	Is_control  bool      `json:"isControl" db:"is_control"`
+	Strata      string    `json:"strata" db:"strata"`
 }
 
 // SurveyElementAlt is a stripped down SurveyElement intended for GetSurveyElements response payload
@@ -86,7 +104,7 @@ type SurveyStructure struct {
 	Stories          float64   `db:"num_story" json:"stories"`
 	SqFt             float64   `db:"sqft" json:"sq_ft"`
 	FoundType        string    `db:"found_type" json:"found_type"`
-	RsmeansType      string    `db:"rsmeans_type" json:"rsmeans_type"`
+	ReplacementType  string    `db:"replacement_type" json:"replacement_type"`
 	Quality          string    `db:"quality" json:"quality"`
 	ConstType        string    `db:"const_type" json:"const_type"`
 	Garage           string    `db:"garage" json:"garage"`
@@ -99,7 +117,7 @@ type SurveyResult struct {
 	UserName  string    `db:"user_name" json:"userName"`
 	Completed bool      `db:"completed" json:"completed"`
 	IsControl bool      `db:"is_control" json:"isControl"`
-
+	Strata    string    `json:"strata" db:"strata"`
 	SurveyStructure
 }
 
@@ -110,6 +128,7 @@ func (sr SurveyResult) String() []string {
 		fmt.Sprintf(`"%s"`, sr.UserName),
 		strconv.FormatBool(sr.Completed),
 		strconv.FormatBool(sr.IsControl),
+		sr.Strata,
 		sr.SAID.String(),
 		strconv.Itoa(sr.FDID),
 		strconv.FormatFloat(sr.X, 'f', 8, 64),
@@ -123,7 +142,7 @@ func (sr SurveyResult) String() []string {
 		strconv.FormatFloat(sr.Stories, 'f', 4, 64),
 		strconv.FormatFloat(sr.SqFt, 'f', 4, 64),
 		fmt.Sprintf(`"%s"`, sr.FoundType),
-		fmt.Sprintf(`"%s"`, sr.RsmeansType),
+		fmt.Sprintf(`"%s"`, sr.ReplacementType),
 		fmt.Sprintf(`"%s"`, sr.Quality),
 		fmt.Sprintf(`"%s"`, sr.ConstType),
 		fmt.Sprintf(`"%s"`, sr.Garage),

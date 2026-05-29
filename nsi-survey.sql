@@ -2,7 +2,15 @@ create table survey (
     id uuid not null default gen_random_uuid() primary key,
     title varchar(200) not null,
     description text,
-    active boolean
+    active boolean,
+    due_date varchar(12),
+    inventory_source varchar(50),
+    stratification_type varchar(15),
+    margin double precision default 0.0,
+    proportion double precision default 0.0,
+    confidence double precision default 0.0,
+    pct_control double precision default 0.0,
+    perimeter_geom geometry(Geometry, 4326)
 );
 
 create table survey_element (
@@ -10,7 +18,8 @@ create table survey_element (
     survey_id uuid not null,
     survey_order int not null,
     fd_id int not null,
-    is_control boolean default false
+    is_control boolean default false,
+    strata varchar(15)
 );
 
 create table users(
@@ -44,7 +53,7 @@ create table survey_assignment (
 
 create table survey_result(
     id uuid not null default gen_random_uuid() primary key,
-    sa_id uuid not null,
+    sa_id uuid not null UNIQUE,
     fd_id int not null,
     X double precision not null,
     Y double precision not null,
@@ -57,7 +66,7 @@ create table survey_result(
     num_story double precision,
     sqft double precision,
     found_type varchar(4),
-    rsmeans_type varchar(50),
+    replacement_type varchar(50),
     quality varchar(50),
     const_type varchar(50),
     garage varchar(50),
