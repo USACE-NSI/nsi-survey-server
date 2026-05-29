@@ -11,6 +11,6 @@ RUN go get -d -v \
     && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 \
     go build -ldflags="-w -s" -o /go/bin/server
 # SCRATCH IMAGE
-FROM scratch
+FROM scratch AS prod
 COPY --from=builder /go/bin/server /go/bin/server
 ENTRYPOINT ["/go/bin/server"]
