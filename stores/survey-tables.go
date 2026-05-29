@@ -1,45 +1,101 @@
 package stores
 
 import (
-	"fmt"
-
-	"github.com/HydrologicEngineeringCenter/nsi_survey_server/global"
-	"github.com/HydrologicEngineeringCenter/nsi_survey_server/models"
+	"github.com/usace-nsi/nsi-survey-server/models"
 	dq "github.com/usace/goquery"
 )
 
 var surveyTable = dq.TableDataSet{
-	Name:   "",
-	Schema: "",
+	Name:   "survey",
+	Schema: "public",
 	Statements: map[string]string{
-		"selectById": `select * from survey where id=$1`,
-		"insert":     `insert into survey (title,description,active) values ($1,$2,$3) returning id`,
-		"update":     `update survey set title=$1,description=$2,active=$3 where id=$4`,
-		"nsi-survey": fmt.Sprintf(`select $2::uuid as sa_id, false as invalid_structure, false as no_street_view,fd_id,x,y,cbfips,occtype,st_damcat,found_ht,0.0 as num_story, 0.0 as sqft,found_type,
-						'' as rsmeans_type, '' as quality, '' as const_type, '' as garage, '' as roof_style
-						from %s.%s where fd_id=(select fd_id from survey_element where id=$1)`, global.DB_NSI_SCHEMA, global.DB_NSI_TABLENAME),
-		"survey": `select sa_id, fd_id,x,y,invalid_structure,no_street_view,cbfips,occtype,st_damcat,found_ht,num_story,sqft,
-					found_type,rsmeans_type,quality,const_type,garage,roof_style
-					from survey_result where sa_id=$1`,
-		"user-surveys": `select distinct s.id,s.title,s.description,s.active
-							from survey s
-							left outer join survey_member sm on sm.survey_id=s.id
-							where sm.user_id=$1`,
-		"admin-surveys": `select distinct s.id,s.title,s.description,s.active
-							from survey s
-							left outer join survey_member sm on sm.survey_id=s.id`,
-		"insert-owner": `insert into survey_member (survey_id,user_id,is_owner) values ($1,$2,$3)`,
-		"members": `select distinct m.id, m.user_id, u.user_name, m.is_owner
-                    from survey_member m
-                    left outer join users u on m.user_id=u.user_id
-                    where m.survey_id=$1`,
+		"selectById": `
+			SELECT 
+				id, title, description, active, due_date, inventory_source,
+				stratification_type, margin, proportion, confidence, pct_control,
+				ST_AsGeoJSON(perimeter_geom) AS perimeter_geom
+			FROM survey 
+			WHERE id = $1`,
+
+		"insert": `
+			INSERT INTO survey (
+				title, description, active, due_date, inventory_source, 
+				stratification_type, margin, proportion, confidence, pct_control,
+				perimeter_geom
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
+			RETURNING id`,
+
+		"update": `
+			UPDATE survey SET 
+				title = $1, description = $2, active = $3, due_date = $4,
+				inventory_source = $5, stratification_type = $6, margin = $7,
+				proportion = $8, confidence = $9, pct_control = $10,
+				perimeter_geom = $11
+			WHERE id = $12
+			`,
+		"survey": `
+			SELECT 
+				sa_id, fd_id, x, y, invalid_structure, no_street_view, cbfips, occtype, 
+				st_damcat, found_ht, num_story, sqft, found_type, replacement_type, 
+				quality, const_type, garage, roof_style
+			FROM survey_result 
+			WHERE sa_id = $1`,
+
+		"user-surveys": `
+			SELECT DISTINCT 
+				s.id, s.title, s.description, s.active, s.due_date, s.inventory_source,
+				s.stratification_type, s.margin, s.proportion, s.confidence, s.pct_control,
+				ST_AsGeoJSON(s.perimeter_geom) AS perimeter_geom
+			FROM survey s
+			LEFT OUTER JOIN survey_member sm ON sm.survey_id = s.id
+			WHERE sm.user_id = $1`,
+
+		"admin-surveys": `
+			SELECT DISTINCT 
+				s.id, s.title, s.description, s.active, s.due_date, s.inventory_source,
+				s.stratification_type, s.margin, s.proportion, s.confidence, s.pct_control,
+				ST_AsGeoJSON(s.perimeter_geom) AS perimeter_geom
+			FROM survey s
+			LEFT OUTER JOIN survey_member sm ON sm.survey_id = s.id`,
+
+		"insert-owner": `
+			INSERT INTO survey_member (survey_id, user_id, is_owner) 
+			VALUES ($1, $2, $3)`,
+
+		"members": `
+			SELECT DISTINCT m.id, m.user_id, u.user_name, m.is_owner
+			FROM survey_member m
+			LEFT OUTER JOIN users u ON m.user_id = u.user_id
+			WHERE m.survey_id = $1`,
+
+		"updateGeometryFromElements": `
+			UPDATE survey 
+			SET perimeter_geom = (
+				SELECT ST_ConvexHull(ST_Collect(ST_SetSRID(ST_MakePoint(x, y), 4326)))
+				FROM survey_element
+				WHERE survey_id = $1
+				  AND x IS NOT NULL 
+				  AND y IS NOT NULL
+			)
+			WHERE id = $1`,
+
+		"updateGeometryFromGeoJSON": `
+			UPDATE survey 
+			SET perimeter_geom = ST_SetSRID(ST_GeomFromGeoJSON($2), 4326)
+			WHERE id = $1`,
+		"delete": `DELETE FROM survey WHERE id = $1`,
+		"selectPerimeter": `
+			SELECT ST_AsGeoJSON(perimeter_geom) AS perimeter_geom
+			FROM survey
+			WHERE id = $1`,
 	},
 	Fields: models.Survey{},
 }
 
 var usersTable = dq.TableDataSet{
 	Statements: map[string]string{
-		"insert": `insert into users values ($1,$2)`,
+		"insert": `insert into users (user_id, user_name) values ($1, $2)
+		           ON CONFLICT (user_id) DO UPDATE SET user_name = EXCLUDED.user_name`,
 	},
 }
 
@@ -51,6 +107,7 @@ var surveyMemberTable = dq.TableDataSet{
 		"select_owners":    "select * from survey_member where survey_id=$1",
 		"remove":           `delete from survey_member where user_id=$1`,
 		"removeFromSurvey": `delete from survey_member where user_id=$1 and survey_id=$2`,
+		"removeBySurvey":   `delete from survey_member where survey_id=$1`,
 	},
 	Fields: models.SurveyMember{},
 }
@@ -59,6 +116,7 @@ var surveyElementTable = dq.TableDataSet{
 	Name: "survey_element",
 	Statements: map[string]string{
 		"select_elements": `select survey_order, fd_id, is_control from survey_element where survey_id=$1`,
+		"deleteElements":  `DELETE FROM survey_element WHERE survey_id = $1`,
 	},
 	Fields: models.SurveyElement{},
 }
@@ -67,7 +125,12 @@ var surveyAssignmentTable = dq.TableDataSet{
 	Name: "survey_assignment",
 	Statements: map[string]string{
 		"updateAssignment": `update survey_assignment set completed='true' where id=$1`,
-		"assignSurvey":     `insert into survey_assignment (se_id,assigned_to) values ($1,$2) returning id`,
+		"deleteAssignments": `
+			DELETE FROM survey_assignment
+			WHERE se_id IN (
+				SELECT id FROM survey_element WHERE survey_id = $1
+			)`,
+		"assignSurvey": `insert into survey_assignment (se_id,assigned_to) values ($1,$2) returning id`,
 		"assignmentInfo": `
 			select
 				sa_id,
@@ -143,24 +206,46 @@ var surveyAssignmentTable = dq.TableDataSet{
 								where se1.survey_id=$2 and (se2.survey_id=$2  or se2.survey_id is null)
 							) assignment_query
 							order by survey_order limit 1`,
+		"previousAssignment": `
+			SELECT id, survey_order, survey_id, fd_id, is_control
+			FROM survey_element
+			WHERE survey_id = $2 
+			AND survey_order < (
+				SELECT COALESCE(MAX(se.survey_order), 0)
+				FROM survey_assignment sa
+				INNER JOIN survey_element se ON se.id = sa.se_id
+				WHERE sa.assigned_to = $1 AND se.survey_id = $2
+			)
+			ORDER BY survey_order DESC
+			LIMIT 1`,
+		"previousAssignmentExisting": `
+			SELECT sa.id AS sa_id, se.id AS se_id
+			FROM survey_assignment sa
+			INNER JOIN survey_element se ON se.id = sa.se_id
+			WHERE sa.assigned_to = $1
+			AND se.survey_id = $2
+			AND se.survey_order < (
+				SELECT COALESCE(MAX(se2.survey_order), 0)
+				FROM survey_assignment sa2
+				INNER JOIN survey_element se2 ON se2.id = sa2.se_id
+				WHERE sa2.assigned_to = $1 AND se2.survey_id = $2
+			)
+			ORDER BY se.survey_order DESC
+			LIMIT 1`,
 	},
+
 	Fields: models.SurveyAssignment{},
 }
 
 var resultTable = dq.TableDataSet{
 	Statements: map[string]string{
-
-		"nsi_survey": fmt.Sprintf(`select $2::uuid as sa_id, false as invalid_structure, false as no_street_view,fd_id,x,y,cbfips,occtype,st_damcat,found_ht,0 as num_story, 0.0 as sqft,found_type,
-						'' as rsmeans_type, '' as quality, '' as const_type, '' as garage, '' as roof_style
-						from %s.%s where fd_id=(select fd_id from survey_element where id=$1)`, global.DB_NSI_SCHEMA, global.DB_NSI_TABLENAME),
-
 		"upsertSurveyStructure": `insert into survey_result
-									(sa_id,fd_id,x,y,invalid_structure,no_street_view,cbfips,occtype,st_damcat,found_ht,num_story,sqft,found_type,rsmeans_type,quality,const_type,garage,roof_style)
+									(sa_id,fd_id,x,y,invalid_structure,no_street_view,cbfips,occtype,st_damcat,found_ht,num_story,sqft,found_type,replacement_type,quality,const_type,garage,roof_style)
 									values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
 									ON CONFLICT (sa_id)
 									DO UPDATE SET x=EXCLUDED.x,y=EXCLUDED.y,invalid_structure=EXCLUDED.invalid_structure,no_street_view=EXCLUDED.no_street_view, cbfips=EXCLUDED.cbfips,
 													occtype=EXCLUDED.occtype,st_damcat=EXCLUDED.st_damcat,found_ht=EXCLUDED.found_ht,num_story=EXCLUDED.num_story,
-												sqft=EXCLUDED.sqft,found_type=EXCLUDED.found_type,rsmeans_type=EXCLUDED.rsmeans_type,
+												sqft=EXCLUDED.sqft,found_type=EXCLUDED.found_type,replacement_type=EXCLUDED.replacement_type,
 												quality=EXCLUDED.quality,const_type=EXCLUDED.const_type,garage=EXCLUDED.garage,roof_style=EXCLUDED.roof_style`,
 
 		"surveyReport": `select
@@ -180,7 +265,7 @@ var resultTable = dq.TableDataSet{
 				t1.num_story,
 				t1.sqft,
 				t1.found_type,
-				t1.rsmeans_type,
+				t1.replacement_type,
 				t1.quality,
 				t1.const_type,
 				t1.garage,
@@ -192,5 +277,13 @@ var resultTable = dq.TableDataSet{
 				inner join users t3 on t3.user_id=t2.assigned_to
 				inner join survey_element t4 on t4.id=t2.se_id
 				where t4.survey_id=$1`,
+		"delete-results": `
+			DELETE FROM survey_result
+			WHERE sa_id IN (
+				SELECT sa.id
+				FROM survey_assignment sa
+				INNER JOIN survey_element se ON se.id = sa.se_id
+				WHERE se.survey_id = $1
+			)`,
 	},
 }

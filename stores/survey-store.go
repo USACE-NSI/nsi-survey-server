@@ -2,12 +2,12 @@ package stores
 
 import (
 	"context"
+	"fmt"
 	"log"
-	"strings"
 
-	"github.com/HydrologicEngineeringCenter/nsi_survey_server/config"
-	"github.com/HydrologicEngineeringCenter/nsi_survey_server/models"
 	"github.com/google/uuid"
+	"github.com/usace-nsi/nsi-survey-server/config"
+	"github.com/usace-nsi/nsi-survey-server/models"
 	"github.com/usace/goquery"
 )
 
@@ -18,12 +18,13 @@ type SurveyStore struct {
 }
 
 func CreateSurveyStore(appConfig *config.Config) (*SurveyStore, error) {
-	dbconf := appConfig.Rdbmsconfig()
-	ds, err := goquery.NewRdbmsDataStore(&dbconf)
+	//dbconf := appConfig.Rdbmsconfig()
+	dbconf := goquery.RdbmsConfigFromEnv()
+	ds, err := goquery.NewRdbmsDataStore(dbconf)
 	if err != nil {
 		log.Printf("Unable to connect to database during startup: %s", err)
 	}
-	log.Printf("Connected as %s to database %s:%s/%s", appConfig.Dbuser, appConfig.Dbhost, appConfig.Dbport, appConfig.Dbname)
+	log.Printf("Connected as %s to database %s:%s/%s", dbconf.Dbuser, dbconf.Dbhost, dbconf.Dbport, dbconf.Dbname)
 
 	//ds.SetMaxOpenConns(4)
 	ss := SurveyStore{ds}
@@ -96,25 +97,51 @@ func (ss *SurveyStore) CreateNewSurvey(survey models.Survey, userId string) (uui
 			DataSet(&surveyTable).
 			Tx(&tx).
 			StatementKey("insert").
-			Params(survey.Title, survey.Description, survey.Active).
+			Params(
+				survey.Title,
+				survey.Description,
+				survey.Active,
+				survey.DueDate,
+				survey.InventorySource,
+				survey.StratificationType,
+				survey.Margin,
+				survey.Proportion,
+				survey.Confidence,
+				survey.PercentControlStructures,
+				survey.PerimeterGeom,
+			).
 			Dest(&surveyId).
 			Fetch()
-
 		if err != nil {
-			panic(err)
+			panic(fmt.Errorf("failed to insert survey: %w", err))
 		}
+
 		ptx := tx.PgxTx()
 		_, err = ptx.Exec(context.Background(), surveyTable.Statements["insert-owner"], surveyId, userId, true)
 		if err != nil {
-			panic(err)
+			panic(fmt.Errorf("failed to map survey owner record constraints: %w", err))
 		}
 	})
 	return surveyId, err
 }
 
 func (ss *SurveyStore) UpdateSurvey(survey models.Survey) error {
-	err := ss.DS.Exec(goquery.NoTx, surveyTable.Statements["update"], survey.Title, survey.Description, survey.Active, survey.ID)
-	return err
+	return ss.DS.Exec(
+		goquery.NoTx,
+		surveyTable.Statements["update"],
+		survey.Title,
+		survey.Description,
+		survey.Active,
+		survey.DueDate,
+		survey.InventorySource,
+		survey.StratificationType,
+		survey.Margin,
+		survey.Proportion,
+		survey.Confidence,
+		survey.PercentControlStructures,
+		survey.PerimeterGeom,
+		survey.ID,
+	)
 }
 
 func (ss *SurveyStore) UpsertSurveyMember(member models.SurveyMember) error {
@@ -154,6 +181,26 @@ func (ss *SurveyStore) AssignSurvey(userId string, seId uuid.UUID) (uuid.UUID, e
 	return saId, err
 }
 
+// PreviousAssignedSurveyElement rolls back a user assignment by one survey element order step.
+// It returns the newly created survey assignment UUID alongside its corresponding element UUID.
+func (ss *SurveyStore) PreviousAssignedSurveyElement(userId string, surveyId uuid.UUID) (uuid.UUID, uuid.UUID, error) {
+	type prevRow struct {
+		SAID uuid.UUID `db:"sa_id"`
+		SEID uuid.UUID `db:"se_id"`
+	}
+	var row prevRow
+	err := ss.DS.Select(surveyAssignmentTable.Statements["previousAssignmentExisting"]).
+		Params(userId, surveyId).
+		Dest(&row).
+		Fetch()
+	if err != nil {
+		if err.Error() == NoResults {
+			return uuid.Nil, uuid.Nil, nil // surveyor is on the first element
+		}
+		return uuid.Nil, uuid.Nil, err
+	}
+	return row.SAID, row.SEID, nil
+}
 func (ss SurveyStore) InsertSurveyAssignments(assignments *[]models.SurveyAssignment) error {
 	err := ss.DS.Insert(&surveyAssignmentTable).
 		Records(assignments).
@@ -203,26 +250,28 @@ func (ss *SurveyStore) GetStructure(seId uuid.UUID, saId uuid.UUID) (models.Surv
 		Params(saId).
 		Dest(&s).
 		Fetch()
-	if err != nil {
-		if err.Error() == NoResults {
-			//no existing survey result, get survey data from nsi
-			err = ss.DS.Select(surveyTable.Statements["nsi-survey"]).
-				Params(seId, saId).
-				Dest(&s).
-				Fetch()
-			if err != nil {
-				log.Printf("Failed to retrieve structure: %s/n", err)
-				return s, err
-			}
-			s.OccupancyType = strings.Split(s.OccupancyType, "-")[0]
-			return s, nil
-		} else {
-			log.Printf("Failed to query survey results for existing assignment: %s/n", err)
-			return s, err //return error
-		}
+	if err == nil {
+		log.Printf("Returning existing Survey Result for assignment: %s", saId)
+		return s, nil
 	}
-	log.Printf("Returning existing Survey Result for survey assignment: %d/n", saId)
-	return s, err //return survey from survey_result
+	if err.Error() != NoResults {
+		log.Printf("Failed to query survey results for existing assignment: %s", err)
+		return s, err
+	}
+
+	// No saved result yet — stub from survey_element so the client can hydrate from NSI.
+	var fdId int
+	ferr := ss.DS.Select("SELECT fd_id FROM survey_element WHERE id=$1").
+		Params(seId).
+		Dest(&fdId).
+		Fetch()
+	if ferr != nil {
+		log.Printf("Failed to look up fd_id for seId %s: %s", seId, ferr)
+		return s, ferr
+	}
+	s.SAID = saId
+	s.FDID = fdId
+	return s, nil
 }
 
 func (ss *SurveyStore) SaveSurvey(survey *models.SurveyStructure) error {
@@ -231,7 +280,7 @@ func (ss *SurveyStore) SaveSurvey(survey *models.SurveyStructure) error {
 		_, txerr := pgtx.Exec(context.Background(), resultTable.Statements["upsertSurveyStructure"],
 			survey.SAID, survey.FDID, survey.X, survey.Y, survey.InvalidStructure, survey.NoStreetView,
 			survey.CBfips, survey.OccupancyType, survey.Damcat, survey.FoundHt, survey.Stories, survey.SqFt,
-			survey.FoundType, survey.RsmeansType, survey.Quality, survey.ConstType, survey.Garage, survey.RoofStyle)
+			survey.FoundType, survey.ReplacementType, survey.Quality, survey.ConstType, survey.Garage, survey.RoofStyle)
 		if txerr != nil {
 			panic(txerr)
 		}
@@ -241,6 +290,28 @@ func (ss *SurveyStore) SaveSurvey(survey *models.SurveyStructure) error {
 		}
 	})
 	return err
+}
+func (s *SurveyStore) DeleteSurvey(surveyId string) error {
+	tx, err := s.DS.NewTransaction()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmts := []string{
+		resultTable.Statements["delete-results"],
+		surveyAssignmentTable.Statements["deleteAssignments"],
+		surveyElementTable.Statements["deleteElements"],
+		surveyMemberTable.Statements["removeBySurvey"],
+		surveyTable.Statements["delete"],
+	}
+	for _, q := range stmts {
+
+		if err := s.DS.Exec(&tx, q, surveyId); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func (ss *SurveyStore) IsOwner(surveyId uuid.UUID, userId string) bool {
