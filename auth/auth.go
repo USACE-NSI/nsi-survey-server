@@ -20,7 +20,7 @@ func Appauth(c *echo.Context, authstore interface{}, roles []int, claims JwtClai
 	store := authstore.(*stores.SurveyStore)
 	//adding user to the user table
 	store.AddUser(models.User{
-		UserID:   claims.Sub, //@TODO is sub dodid? is that pii?
+		UserID:   claims.Sub, 
 		Username: claims.UserName,
 	})
 

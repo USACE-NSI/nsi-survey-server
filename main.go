@@ -21,9 +21,9 @@ func main() {
 	}
 	//cfg.SkipJWT = true
 
-	ss, err := stores.CreateSurveyStore(&cfg)
+	ss, err := stores.CreateSurveyStoreWithRetry(&cfg)
 	if err != nil {
-		log.Printf("Unable to connect to database during startup: %s", err)
+		log.Fatalf("Unable to connect to database during startup: %s", err)
 	}
 	//fmt.Println(cfg.Ippk)
 	surveyHandler := handlers.CreateSurveyHandler(ss)
@@ -33,7 +33,7 @@ func main() {
 		Store:     ss,
 	}
 	if err := auth.LoadVerificationKey(microauth.VerificationKeyOptions{
-		KeySource: microauth.KeyFile,
+		KeySource: microauth.KeyString,
 		KeyVal:    cfg.Ippk,
 	}); err != nil {
 		log.Fatalf("LoadVerificationKey failed: %v", err)

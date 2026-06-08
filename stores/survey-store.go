@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/usace-nsi/nsi-survey-server/config"
@@ -23,14 +24,50 @@ func CreateSurveyStore(appConfig *config.Config) (*SurveyStore, error) {
 	ds, err := goquery.NewRdbmsDataStore(dbconf)
 	if err != nil {
 		log.Printf("Unable to connect to database during startup: %s", err)
+		return nil, fmt.Errorf("connecting to database %s:%s/%s as %s: %w",
+			dbconf.Dbhost, dbconf.Dbport, dbconf.Dbname, dbconf.Dbuser, err)
+		//os.Exit(1)
 	}
-	log.Printf("Connected as %s to database %s:%s/%s", dbconf.Dbuser, dbconf.Dbhost, dbconf.Dbport, dbconf.Dbname)
+	// pgx pools connect lazily, so NewRdbmsDataStore succeeding doesn't prove the
+	// DB is reachable. Force a round-trip so a dead DB fails HERE, not on the
+	// first request (which is what panicked in AddUser).
+	if err := ds.Exec(goquery.NoTx, "SELECT 1"); err != nil {
+		return nil, fmt.Errorf("database %s:%s/%s not reachable: %w",
+			dbconf.Dbhost, dbconf.Dbport, dbconf.Dbname, err)
+	}
 
-	//ds.SetMaxOpenConns(4)
-	ss := SurveyStore{ds}
-	return &ss, nil
+	// Only log success once we KNOW it's true.
+	log.Printf("Connected as %s to database %s:%s/%s",
+		dbconf.Dbuser, dbconf.Dbhost, dbconf.Dbport, dbconf.Dbname)
+	return &SurveyStore{ds}, nil
+
 }
-
+func CreateSurveyStoreWithRetry(appConfig *config.Config) (*SurveyStore, error) {
+	const (
+		maxAttempts = 10
+		baseDelay   = 1 * time.Second
+		maxDelay    = 30 * time.Second
+	)
+	delay := baseDelay
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		ss, err := CreateSurveyStore(appConfig)
+		if err == nil {
+			log.Printf("datastore connected (attempt %d/%d)", attempt, maxAttempts)
+			return ss, nil
+		}
+		lastErr = err
+		log.Printf("datastore connect failed (attempt %d/%d): %v; retrying in %s",
+			attempt, maxAttempts, err, delay)
+		if attempt < maxAttempts {
+			time.Sleep(delay)
+			if delay *= 2; delay > maxDelay {
+				delay = maxDelay
+			}
+		}
+	}
+	return nil, fmt.Errorf("could not connect to datastore after %d attempts: %w", maxAttempts, lastErr)
+}
 func (ss *SurveyStore) AddUser(user models.User) error {
 	return ss.DS.Exec(goquery.NoTx, usersTable.Statements["insert"], user.UserID, user.Username)
 }
