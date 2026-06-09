@@ -2,6 +2,7 @@ package stores
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -129,7 +130,16 @@ func (ss *SurveyStore) GetSurvey(surveyId uuid.UUID) (models.Survey, error) {
 
 func (ss *SurveyStore) CreateNewSurvey(survey models.Survey, userId string) (uuid.UUID, error) {
 	var surveyId uuid.UUID
-	err := ss.DS.Transaction(func(tx goquery.Tx) {
+	if survey.Proportions == nil {
+		survey.Proportions = map[string]float64{}
+	}
+
+	propsJSON, err := json.Marshal(survey.Proportions) // nil map -> "null"; see note
+	if err != nil {
+		return surveyId, fmt.Errorf("failed to encode proportions: %w", err)
+	}
+
+	err = ss.DS.Transaction(func(tx goquery.Tx) {
 		err := ss.DS.Select().
 			DataSet(&surveyTable).
 			Tx(&tx).
@@ -142,7 +152,7 @@ func (ss *SurveyStore) CreateNewSurvey(survey models.Survey, userId string) (uui
 				survey.InventorySource,
 				survey.StratificationType,
 				survey.Margin,
-				survey.Proportion,
+				propsJSON,
 				survey.Confidence,
 				survey.PercentControlStructures,
 				survey.PerimeterGeom,
@@ -163,6 +173,14 @@ func (ss *SurveyStore) CreateNewSurvey(survey models.Survey, userId string) (uui
 }
 
 func (ss *SurveyStore) UpdateSurvey(survey models.Survey) error {
+	if survey.Proportions == nil {
+		survey.Proportions = map[string]float64{}
+	}
+
+	propsJSON, err := json.Marshal(survey.Proportions) // nil map -> "null"; see note
+	if err != nil {
+		return fmt.Errorf("failed to encode proportions: %w", err)
+	}
 	return ss.DS.Exec(
 		goquery.NoTx,
 		surveyTable.Statements["update"],
@@ -173,7 +191,7 @@ func (ss *SurveyStore) UpdateSurvey(survey models.Survey) error {
 		survey.InventorySource,
 		survey.StratificationType,
 		survey.Margin,
-		survey.Proportion,
+		propsJSON,
 		survey.Confidence,
 		survey.PercentControlStructures,
 		survey.PerimeterGeom,

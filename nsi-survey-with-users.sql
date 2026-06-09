@@ -81,3 +81,29 @@ create table survey_result(
 CREATE UNIQUE INDEX idx_sr_said ON survey_result (sa_id);
 ALTER TABLE survey_result ADD CONSTRAINT unique_sa_id UNIQUE USING INDEX idx_sr_said;
 
+
+
+insert into users values ('987654','Randy Goss');
+insert into users values ('987655','Will Lehman');
+insert into users values ('987656','Nick Lutz');
+insert into users values ('987657','Jack Goss');
+
+/*
+insert into survey_element (fd_id,is_control) values (9,false);
+insert into survey_element (fd_id,is_control) values (8,false);
+insert into survey_element (fd_id,is_control) values (7,false);
+insert into survey_element (fd_id,is_control) values (6,false);
+insert into survey_element (fd_id,is_control) values (5,true);
+insert into survey_element (fd_id,is_control) values (4,true);
+insert into survey_element (fd_id,is_control) values (3,false);
+insert into survey_element (fd_id,is_control) values (2,true);
+insert into survey_element (fd_id,is_control) values (1,false);
+
+insert into survey_assignment (se_id,assigned_to,completed) values (1,'nn',true);
+insert into survey_assignment (se_id,assigned_to,completed) values (2,'rr',true);
+insert into survey_assignment (se_id,assigned_to,completed) values (3,'rr',true);
+insert into survey_assignment (se_id,assigned_to,completed) values (4,'ww',false);
+insert into survey_assignment (se_id,assigned_to,completed) values (5,'rr',true);
+insert into survey_assignment (se_id,assigned_to,completed) values (6,'rr',false);
+insert into survey_assignment (se_id,assigned_to,completed) values (5,'nn',true);
+*/

@@ -32,7 +32,7 @@ type Survey struct {
 type StratificationInfo struct {
 	StratificationType       StratificationType `db:"stratification_type" json:"stratification_type"`
 	Margin                   float64            `db:"margin" json:"margin"`
-	Proportion               float64            `db:"proportion" json:"proportion"`
+	Proportions              map[string]float64 `db:"proportions" json:"proportions"`
 	Confidence               float64            `db:"confidence" json:"confidence"`
 	PercentControlStructures float64            `db:"pct_control" json:"pct_control"`
 }

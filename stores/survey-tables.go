@@ -12,7 +12,7 @@ var surveyTable = dq.TableDataSet{
 		"selectById": `
 			SELECT 
 				id, title, description, active, due_date, inventory_source,
-				stratification_type, margin, proportion, confidence, pct_control,
+				stratification_type, margin, proportions, confidence, pct_control,
 				ST_AsGeoJSON(perimeter_geom) AS perimeter_geom
 			FROM survey 
 			WHERE id = $1`,
@@ -20,7 +20,7 @@ var surveyTable = dq.TableDataSet{
 		"insert": `
 			INSERT INTO survey (
 				title, description, active, due_date, inventory_source, 
-				stratification_type, margin, proportion, confidence, pct_control,
+				stratification_type, margin, proportions, confidence, pct_control,
 				perimeter_geom
 			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
 			RETURNING id`,
@@ -29,7 +29,7 @@ var surveyTable = dq.TableDataSet{
 			UPDATE survey SET 
 				title = $1, description = $2, active = $3, due_date = $4,
 				inventory_source = $5, stratification_type = $6, margin = $7,
-				proportion = $8, confidence = $9, pct_control = $10,
+				proportions = $8, confidence = $9, pct_control = $10,
 				perimeter_geom = $11
 			WHERE id = $12
 			`,
@@ -44,7 +44,7 @@ var surveyTable = dq.TableDataSet{
 		"user-surveys": `
 			SELECT DISTINCT 
 				s.id, s.title, s.description, s.active, s.due_date, s.inventory_source,
-				s.stratification_type, s.margin, s.proportion, s.confidence, s.pct_control,
+				s.stratification_type, s.margin, s.proportions, s.confidence, s.pct_control,
 				ST_AsGeoJSON(s.perimeter_geom) AS perimeter_geom
 			FROM survey s
 			LEFT OUTER JOIN survey_member sm ON sm.survey_id = s.id
@@ -53,7 +53,7 @@ var surveyTable = dq.TableDataSet{
 		"admin-surveys": `
 			SELECT DISTINCT 
 				s.id, s.title, s.description, s.active, s.due_date, s.inventory_source,
-				s.stratification_type, s.margin, s.proportion, s.confidence, s.pct_control,
+				s.stratification_type, s.margin, s.proportions, s.confidence, s.pct_control,
 				ST_AsGeoJSON(s.perimeter_geom) AS perimeter_geom
 			FROM survey s
 			LEFT OUTER JOIN survey_member sm ON sm.survey_id = s.id`,
