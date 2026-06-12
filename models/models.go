@@ -120,6 +120,10 @@ type SurveyResult struct {
 	Strata    string    `json:"strata" db:"strata"`
 	SurveyStructure
 }
+type SurveyProgress struct {
+    Total     int `db:"total" json:"total"`
+    Completed int `db:"completed" json:"completed"`
+}
 
 func (sr SurveyResult) String() []string {
 	return ([]string{

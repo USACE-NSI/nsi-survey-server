@@ -61,7 +61,11 @@ var surveyTable = dq.TableDataSet{
 		"insert-owner": `
 			INSERT INTO survey_member (survey_id, user_id, is_owner) 
 			VALUES ($1, $2, $3)`,
-
+		"owners": `
+			SELECT DISTINCT u.user_id, u.user_name
+			FROM survey_member m
+			LEFT OUTER JOIN users u ON m.user_id = u.user_id
+			WHERE m.survey_id = $1 AND m.is_owner = true`,
 		"members": `
 			SELECT DISTINCT m.id, m.user_id, u.user_name, m.is_owner
 			FROM survey_member m
@@ -117,6 +121,16 @@ var surveyElementTable = dq.TableDataSet{
 	Statements: map[string]string{
 		"select_elements": `select survey_order, fd_id, is_control from survey_element where survey_id=$1`,
 		"deleteElements":  `DELETE FROM survey_element WHERE survey_id = $1`,
+		"progress": `SELECT
+    count(*) AS total,
+    count(*) FILTER (WHERE EXISTS (
+        SELECT 1 FROM survey_assignment sa
+        WHERE sa.se_id = se.id
+          AND sa.completed = true
+    )) AS completed
+FROM survey_element se
+WHERE se.survey_id = $1
+`,
 	},
 	Fields: models.SurveyElement{},
 }

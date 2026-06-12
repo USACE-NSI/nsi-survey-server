@@ -52,6 +52,8 @@ func main() {
 	loggedInGroup.POST("/survey", auth.AuthorizeRoute(surveyHandler.CreateNewSurvey, ADMIN, PUBLIC))
 	loggedInGroup.DELETE("/survey/:surveyid", auth.AuthorizeRoute(surveyHandler.DeleteSurvey, ADMIN, SURVEY_OWNER))
 	loggedInGroup.PUT("/survey/:surveyid", auth.AuthorizeRoute(surveyHandler.UpdateSurvey, ADMIN, SURVEY_OWNER))
+	loggedInGroup.GET("/survey/:surveyid/progress", auth.AuthorizeRoute(surveyHandler.GetSurveyProgress, ADMIN, SURVEY_OWNER, SURVEY_MEMBER))
+	loggedInGroup.GET("/survey/:surveyid/owners", auth.AuthorizeRoute(surveyHandler.GetSurveyOwners, PUBLIC))
 	loggedInGroup.GET("/survey/:surveyid/members", auth.AuthorizeRoute(surveyHandler.GetSurveyMembers, ADMIN, SURVEY_OWNER))
 	loggedInGroup.POST("/survey/:surveyid/member", auth.AuthorizeRoute(surveyHandler.UpsertSurveyMember, ADMIN, SURVEY_OWNER))
 	loggedInGroup.DELETE("/survey/member/:memberid", auth.AuthorizeRoute(surveyHandler.RemoveSurveyMember, ADMIN, SURVEY_OWNER))

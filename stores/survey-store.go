@@ -94,7 +94,16 @@ func (ss *SurveyStore) GetSurveysforAdmin() (*[]models.Survey, error) {
 		Fetch()
 	return &surveys, err
 }
-
+func (ss *SurveyStore) GetSurveyOwners(surveyId uuid.UUID) (*[]models.User, error) {
+	owners := []models.User{}
+	err := ss.DS.Select().
+		DataSet(&surveyTable).
+		StatementKey("owners").
+		Params(surveyId).
+		Dest(&owners).
+		Fetch()
+	return &owners, err
+}
 func (ss *SurveyStore) GetSurveyMembers(surveyId uuid.UUID) (*[]models.SurveyMemberAlt, error) {
 	members := []models.SurveyMemberAlt{}
 	err := ss.DS.Select().
@@ -104,6 +113,16 @@ func (ss *SurveyStore) GetSurveyMembers(surveyId uuid.UUID) (*[]models.SurveyMem
 		Dest(&members).
 		Fetch()
 	return &members, err
+}
+func (ss *SurveyStore) GetSurveyProgress(surveyId uuid.UUID) (models.SurveyProgress, error) {
+	p := models.SurveyProgress{}
+	err := ss.DS.Select().
+		DataSet(&surveyElementTable).
+		StatementKey("progress").
+		Params(surveyId).
+		Dest(&p).
+		Fetch()
+	return p, err
 }
 
 func (ss *SurveyStore) GetSurveyElements(surveyId uuid.UUID) (*[]models.SurveyElementAlt, error) {

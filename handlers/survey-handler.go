@@ -109,6 +109,22 @@ func (sh *SurveyHandler) DeleteSurvey(c *echo.Context) error {
 	return c.NoContent(http.StatusNoContent)
 }
 
+// Returns an array of owners (survey_member rows with is_owner = true) for a given survey. Returns a JSON array.
+//
+// PUBLIC API
+func (sh *SurveyHandler) GetSurveyOwners(c *echo.Context) error {
+	surveyId, err := uuid.Parse(c.Param("surveyid"))
+	if err != nil {
+		return err
+	}
+
+	owners, err := sh.store.GetSurveyOwners(surveyId)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, &owners)
+}
+
 // Gets an array of survey members for a given survey. Returns a JSON array.
 //
 // PRIVATE API restricted to the ADMIN or SURVEY_OWNER roles
@@ -123,6 +139,18 @@ func (sh *SurveyHandler) GetSurveyMembers(c *echo.Context) error {
 		return err
 	}
 	return c.JSON(http.StatusOK, &members)
+}
+func (sh *SurveyHandler) GetSurveyProgress(c *echo.Context) error {
+	surveyId, err := uuid.Parse(c.Param("surveyid"))
+	if err != nil {
+		return err
+	}
+
+	progress, err := sh.store.GetSurveyProgress(surveyId)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, &progress)
 }
 
 // Updates/Inserts a survey member record. Returns an empty HTTP CREATED (201) result on success.
