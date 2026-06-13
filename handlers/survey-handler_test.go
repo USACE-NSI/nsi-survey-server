@@ -15,7 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/usace-nsi/nsi-survey-server/models"
 	"github.com/usace-nsi/nsi-survey-server/stores"
-	"github.com/usace/goquery"
+	"github.com/usace/goquery/v3"
 	"github.com/usace/microauth"
 )
 

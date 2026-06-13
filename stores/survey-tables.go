@@ -2,7 +2,7 @@ package stores
 
 import (
 	"github.com/usace-nsi/nsi-survey-server/models"
-	dq "github.com/usace/goquery"
+	dq "github.com/usace/goquery/v3"
 )
 
 var surveyTable = dq.TableDataSet{
@@ -93,7 +93,7 @@ var surveyTable = dq.TableDataSet{
 			FROM survey
 			WHERE id = $1`,
 	},
-	Fields: models.Survey{},
+	TableFields: models.Survey{},
 }
 
 var usersTable = dq.TableDataSet{
@@ -113,7 +113,7 @@ var surveyMemberTable = dq.TableDataSet{
 		"removeFromSurvey": `delete from survey_member where user_id=$1 and survey_id=$2`,
 		"removeBySurvey":   `delete from survey_member where survey_id=$1`,
 	},
-	Fields: models.SurveyMember{},
+	TableFields: models.SurveyMember{},
 }
 
 var surveyElementTable = dq.TableDataSet{
@@ -132,7 +132,7 @@ FROM survey_element se
 WHERE se.survey_id = $1
 `,
 	},
-	Fields: models.SurveyElement{},
+	TableFields: models.SurveyElement{},
 }
 
 var surveyAssignmentTable = dq.TableDataSet{
@@ -248,7 +248,7 @@ var surveyAssignmentTable = dq.TableDataSet{
 			LIMIT 1`,
 	},
 
-	Fields: models.SurveyAssignment{},
+	TableFields: models.SurveyAssignment{},
 }
 
 var resultTable = dq.TableDataSet{

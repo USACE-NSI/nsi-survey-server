@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"log"
+
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v5"
 	"github.com/usace-nsi/nsi-survey-server/models"
@@ -19,10 +21,20 @@ func Appauth(c *echo.Context, authstore interface{}, roles []int, claims JwtClai
 	c.Set("NSIUSER", claims)
 	store := authstore.(*stores.SurveyStore)
 	//adding user to the user table
-	store.AddUser(models.User{
-		UserID:   claims.Sub, 
+	//adding user to the user table
+	isNew, err := store.AddUser(models.User{
+		UserID:   claims.Sub,
 		Username: claims.UserName,
 	})
+	if err != nil {
+		log.Printf("failed to add/update user %s: %v", claims.Sub, err)
+	} else if isNew {
+		// New user: auto-enroll in the training-survey if one exists.
+		if err := store.AddUserToTrainingSurvey(claims.Sub); err != nil {
+			log.Printf("failed to enroll new user %s in training-survey: %v", claims.Sub, err)
+		}
+	}
+
 
 	surveyId, err := uuid.Parse(c.Param("surveyid"))
 	if c.Param("surveyid") != "" && err == nil { // there is surveyId in url

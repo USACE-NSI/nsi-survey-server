@@ -10,7 +10,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/usace-nsi/nsi-survey-server/config"
 	"github.com/usace-nsi/nsi-survey-server/models"
-	"github.com/usace/goquery"
+	_ "github.com/usace/goquery/adapters/postgres/v3"
+	"github.com/usace/goquery/v3"
 )
 
 var NoResults string = "no rows in result set"
@@ -69,8 +70,44 @@ func CreateSurveyStoreWithRetry(appConfig *config.Config) (*SurveyStore, error) 
 	}
 	return nil, fmt.Errorf("could not connect to datastore after %d attempts: %w", maxAttempts, lastErr)
 }
-func (ss *SurveyStore) AddUser(user models.User) error {
-	return ss.DS.Exec(goquery.NoTx, usersTable.Statements["insert"], user.UserID, user.Username)
+
+// AddUser upserts the user and reports whether the row was newly inserted
+// (true) versus an existing user re-authenticating (false). The xmax = 0 trick
+// distinguishes an INSERT from an ON CONFLICT ... DO UPDATE in a single round trip.
+func (ss *SurveyStore) AddUser(user models.User) (bool, error) {
+	var inserted bool
+	err := ss.DS.Select(`
+		INSERT INTO users (user_id, user_name)
+		VALUES ($1, $2)
+		ON CONFLICT (user_id) DO UPDATE SET user_name = EXCLUDED.user_name
+		RETURNING (xmax = 0) AS inserted`).
+		Params(user.UserID, user.Username).
+		Dest(&inserted).
+		Fetch()
+	return inserted, err
+}
+
+// AddUserToTrainingSurvey enrolls a user as a (non-owner) member of the survey
+// titled "training-survey" if it exists. If no such survey exists, it is a no-op
+// so first-time login still succeeds. ON CONFLICT DO NOTHING keeps it idempotent
+// and never clobbers an existing membership/owner flag.
+func (ss *SurveyStore) AddUserToTrainingSurvey(userId string) error {
+	var surveyId uuid.UUID
+	err := ss.DS.Select(`SELECT id FROM survey WHERE title = $1`).
+		Params("training-survey").
+		Dest(&surveyId).
+		Fetch()
+	if err != nil {
+		if err.Error() == NoResults {
+			return nil // no training-survey; nothing to enroll into
+		}
+		return err
+	}
+	return ss.DS.Exec(goquery.NoTx, `
+		INSERT INTO survey_member (survey_id, user_id, is_owner)
+		VALUES ($1, $2, false)
+		ON CONFLICT (survey_id, user_id) DO NOTHING`,
+		surveyId, userId)
 }
 
 func (ss *SurveyStore) GetSurveysforUser(userId string) (*[]models.Survey, error) {
