@@ -87,9 +87,11 @@ func (ss *SurveyStore) AddUser(user models.User) (bool, error) {
 	return inserted, err
 }
 
-// AddUserToTrainingSurvey enrolls a user as a (non-owner) member of the survey
-// titled "training-survey" if it exists. If no such survey exists, it is a no-op
-// so first-time login still succeeds. ON CONFLICT DO NOTHING keeps it idempotent
+// AddUserToTrainingSurvey enrolls a user as a member of the survey titled
+// "training-survey" if it exists. If the survey currently has no members, the
+// user is enrolled as the owner so the survey always has one; otherwise they
+// are added as a non-owner member. If no such survey exists, it is a no-op so
+// first-time login still succeeds. ON CONFLICT DO NOTHING keeps it idempotent
 // and never clobbers an existing membership/owner flag.
 func (ss *SurveyStore) AddUserToTrainingSurvey(userId string) error {
 	var surveyId uuid.UUID
@@ -103,9 +105,15 @@ func (ss *SurveyStore) AddUserToTrainingSurvey(userId string) error {
 		}
 		return err
 	}
+
+	// Make this user the owner only if the survey has no members yet, so the
+	// survey always has exactly one initial owner. NOT EXISTS is evaluated
+	// atomically within the insert, avoiding a read-then-write race.
 	return ss.DS.Exec(goquery.NoTx, `
 		INSERT INTO survey_member (survey_id, user_id, is_owner)
-		VALUES ($1, $2, false)
+		VALUES ($1, $2, NOT EXISTS (
+			SELECT 1 FROM survey_member WHERE survey_id = $1
+		))
 		ON CONFLICT (survey_id, user_id) DO NOTHING`,
 		surveyId, userId)
 }
