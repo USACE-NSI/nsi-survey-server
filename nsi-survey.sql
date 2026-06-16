@@ -81,3 +81,22 @@ create table survey_result(
 CREATE UNIQUE INDEX idx_sr_said ON survey_result (sa_id);
 ALTER TABLE survey_result ADD CONSTRAINT unique_sa_id UNIQUE USING INDEX idx_sr_said;
 
+-- Default "training-survey" with its survey elements
+insert into survey (id, title, description, active, perimeter_geom)
+values ('00000000-0000-0000-0000-000000000001', 'training-survey', 'Default survey used for training.', true,
+    -- Bounding box covering the lower 48 (continental US): xmin, ymin, xmax, ymax in EPSG:4326
+    ST_MakeEnvelope(-124.848974, 24.396308, -66.885444, 49.384358, 4326));
+
+insert into survey_element (survey_id, survey_order, fd_id, is_control, strata)
+values
+    ('00000000-0000-0000-0000-000000000001', 1, 566378484, true, 'Test'),
+    ('00000000-0000-0000-0000-000000000001', 2, 523367802, true, 'Test'),
+    ('00000000-0000-0000-0000-000000000001', 3, 523235984, true, 'Test'),
+    ('00000000-0000-0000-0000-000000000001', 4, 523367321, true, 'Test'),
+    ('00000000-0000-0000-0000-000000000001', 5, 566606286, true, 'Test'),
+    ('00000000-0000-0000-0000-000000000001', 6, 565241573, true, 'Test'),
+    ('00000000-0000-0000-0000-000000000001', 7, 537488273, true, 'Test'),
+    ('00000000-0000-0000-0000-000000000001', 8, 537488274, true, 'Test'),
+    ('00000000-0000-0000-0000-000000000001', 9, 523474401, true, 'Test'),
+    ('00000000-0000-0000-0000-000000000001', 10, 566320142, true, 'Test'),
+    ('00000000-0000-0000-0000-000000000001', 11, 523292042, true, 'Test');

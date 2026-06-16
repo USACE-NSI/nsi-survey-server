@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,6 +16,13 @@ import (
 )
 
 var NoResults string = "no rows in result set"
+
+// isNoRows reports whether err is goquery's "no rows" result. goquery wraps the
+// pgx message (e.g. "scanning one: no rows in result set"), so match on substring
+// rather than exact equality.
+func isNoRows(err error) bool {
+	return err != nil && strings.Contains(err.Error(), NoResults)
+}
 
 type SurveyStore struct {
 	DS goquery.DataStore
@@ -100,7 +108,7 @@ func (ss *SurveyStore) AddUserToTrainingSurvey(userId string) error {
 		Dest(&surveyId).
 		Fetch()
 	if err != nil {
-		if err.Error() == NoResults {
+		if isNoRows(err) {
 			return nil // no training-survey; nothing to enroll into
 		}
 		return err
@@ -313,7 +321,7 @@ func (ss *SurveyStore) PreviousAssignedSurveyElement(userId string, surveyId uui
 		Dest(&row).
 		Fetch()
 	if err != nil {
-		if err.Error() == NoResults {
+		if isNoRows(err) {
 			return uuid.Nil, uuid.Nil, nil // surveyor is on the first element
 		}
 		return uuid.Nil, uuid.Nil, err
@@ -347,7 +355,7 @@ func (ss *SurveyStore) GetAssignmentInfo(userId string, surveyId uuid.UUID) (mod
 		Dest(&ai).
 		Fetch()
 
-	if err != nil && err.Error() == NoResults {
+	if isNoRows(err) {
 		err = nil
 	}
 
@@ -373,7 +381,7 @@ func (ss *SurveyStore) GetStructure(seId uuid.UUID, saId uuid.UUID) (models.Surv
 		log.Printf("Returning existing Survey Result for assignment: %s", saId)
 		return s, nil
 	}
-	if err.Error() != NoResults {
+	if !isNoRows(err) {
 		log.Printf("Failed to query survey results for existing assignment: %s", err)
 		return s, err
 	}
