@@ -295,11 +295,17 @@ func (sh *SurveyHandler) AssignSurveyElement(c *echo.Context) error {
 	if assignmentInfo.Completed == nil {
 		//the user does not have any uncompleted surveys assigned.  get a new one.
 		nextSurvey = assignmentInfo.NextSurveySEID
-		// control order is less than survey order
-		if assignmentInfo.NextControlOrder != nil && assignmentInfo.NextSurveyOrder != nil &&
-			*assignmentInfo.NextControlOrder < *assignmentInfo.NextSurveyOrder {
+		// Prefer the next control element when either there is no remaining
+		// non-control survey to assign (NextSurveyOrder == nil — e.g. an all-control
+		// training survey, or the tail of a normal survey once non-controls are
+		// exhausted) or the next control precedes the next survey in survey_order.
+		if assignmentInfo.NextControlSEID != nil &&
+			(assignmentInfo.NextSurveyOrder == nil ||
+				(assignmentInfo.NextControlOrder != nil &&
+					*assignmentInfo.NextControlOrder < *assignmentInfo.NextSurveyOrder)) {
 			nextSurvey = assignmentInfo.NextControlSEID
 		}
+
 		if nextSurvey != nil {
 			saId, err := sh.store.AssignSurvey(userId, *nextSurvey)
 			fmt.Println(nextSurvey)

@@ -215,9 +215,9 @@ var surveyAssignmentTable = dq.TableDataSet{
 							where assigned_to is null and is_control='true' and survey_id=$2
 						) as next_control_order
 								) next_assignment
-								inner join survey_element se1 on se1.survey_order=next_assignment.next_survey_order
-								left outer join survey_element se2 on se2.survey_order=next_assignment.next_control_order
-								where se1.survey_id=$2 and (se2.survey_id=$2  or se2.survey_id is null)
+								left outer join survey_element se1 on se1.survey_order=next_assignment.next_survey_order and se1.survey_id=$2
+								left outer join survey_element se2 on se2.survey_order=next_assignment.next_control_order and se2.survey_id=$2
+								where next_assignment.next_survey_order is not null or next_assignment.next_control_order is not null
 							) assignment_query
 							order by survey_order limit 1`,
 		"previousAssignment": `
