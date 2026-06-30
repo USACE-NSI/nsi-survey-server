@@ -418,17 +418,16 @@ func (sh *SurveyHandler) SearchUsers(c *echo.Context) error {
 //
 // PUBLIC API
 func (sh *SurveyHandler) GetAllUsers(c *echo.Context) error {
-	users, err := sh.store.DS.Select("select * from users order by user_name").
+	users := []models.User{}
+	err := sh.store.DS.Select("select * from users order by user_name").
 		Params().
-		FetchJSON()
+		Dest(&users).
+		Fetch()
 	if err != nil {
 		log.Printf("GetAllUsers error: %v", err)
 		return err
 	}
-	if users == nil {
-		return c.JSONBlob(http.StatusOK, []byte("[]"))
-	}
-	return c.JSONBlob(http.StatusOK, users)
+	return c.JSON(http.StatusOK, users)
 }
 
 // Validate that the survey name is available. Returns true if name is unused

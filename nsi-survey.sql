@@ -1,3 +1,5 @@
+create schema nsi_survey authorization nsi_survey;
+
 create table survey (
     id uuid not null default gen_random_uuid() primary key,
     title varchar(200) not null,
@@ -82,8 +84,8 @@ CREATE UNIQUE INDEX idx_sr_said ON survey_result (sa_id);
 ALTER TABLE survey_result ADD CONSTRAINT unique_sa_id UNIQUE USING INDEX idx_sr_said;
 
 -- Default "training-survey" with its survey elements
-insert into survey (id, title, description, active, perimeter_geom)
-values ('00000000-0000-0000-0000-000000000001', 'training-survey', 'Default survey used for training.', true,
+insert into survey (id, title, description, active, due_date, inventory_source, stratification_type, perimeter_geom)
+values ('00000000-0000-0000-0000-000000000001', 'training-survey', 'Default survey used for training.', true, '2099-12-31', 'nsi2026', 'NONE',
     -- Bounding box covering the lower 48 (continental US): xmin, ymin, xmax, ymax in EPSG:4326
     ST_MakeEnvelope(-124.848974, 24.396308, -66.885444, 49.384358, 4326));
 
