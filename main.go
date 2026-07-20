@@ -68,7 +68,7 @@ func main() {
 	loggedInGroup.GET("/users", auth.AuthorizeRoute(surveyHandler.GetAllUsers, PUBLIC))
 	loggedInGroup.GET("/users/search", auth.AuthorizeRoute(surveyHandler.SearchUsers, PUBLIC))
 	loggedInGroup.GET("/survey/valid", auth.AuthorizeRoute(surveyHandler.ValidSurveyName, PUBLIC))
-	loggedInGroup.GET("/survey/:surveyid/report", auth.AuthorizeRoute(surveyHandler.GetSurveyReport, ADMIN, SURVEY_OWNER))
+	loggedInGroup.GET("/survey/:surveyid/report", auth.AuthorizeRoute(surveyHandler.GetSurveyReport, ADMIN, SURVEY_OWNER, SURVEY_MEMBER))
 
 	if err := e.Start(":" + cfg.Port); err != nil {
 		log.Fatalf("Server error: %v", err)
